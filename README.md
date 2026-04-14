@@ -99,114 +99,21 @@ for model in models:
 
 Want to run HW-Router with your own GPUs and models? See **[docs/CUSTOM_HARDWARE_GUIDE.md](docs/CUSTOM_HARDWARE_GUIDE.md)** for a step-by-step walkthrough covering LLM pool config, vLLM setup, data collection, training, and evaluation.
 
-### Reproducing the Paper Results
+### Training HW-Router on Your Own Models
 
-> **Prerequisites:** Steps 2 and 5 require live vLLM servers and at least 2× NVIDIA H100 GPUs (or equivalent). Steps 1, 3, 4, and the offline sweep in Step 5 run on CPU only. See [docs/CUSTOM_HARDWARE_GUIDE.md](docs/CUSTOM_HARDWARE_GUIDE.md) if you are adapting this to your own hardware.
+HW-Router is designed to be adapted to any vLLM serving stack. At a glance, the workflow is:
 
-The pipeline lives under `pipeline/` and is organized in execution order.
+| # | Stage | Command | Runs on |
+|---|---|---|---|
+| 1 | Prepare a prompt dataset | `python pipeline/data_preparation/combine_datasets.py` | CPU |
+| 2 | Collect hardware telemetry from your live vLLM servers | `python pipeline/data_collection/build_hardware_cost_dataset.py --config <your-config>` | GPU |
+| 3 | Train the MLP cost predictor (~20s) | `python -m pipeline.training.train_cost_model` | CPU |
+| 4 | Build an offline evaluation set (optional) | `python pipeline/eval_processing/process_eval_dataset.py …` | CPU |
+| 5 | Offline λ-sweep or online routing eval | `python pipeline/evaluation/eval_lambda_sweep.py …` | CPU / GPU |
 
-#### Step 1 — Data preparation (CPU only)
+Once trained, the cost predictor plugs into any quality predictor (CARROT, IRT, UMR, or your own) to form a hardware-aware router.
 
-Download prompts from MixInstruct and LongBench and build the combined train/eval splits.
-
-```bash
-python pipeline/data_preparation/load_mixinstruct.py
-python pipeline/data_preparation/load_longbench.py
-python pipeline/data_preparation/combine_datasets.py
-
-# Prompt embeddings (used by CARROT and eval processing)
-python pipeline/data_preparation/save_prompt_embeddings.py \
-    --input  data/prompts/mixed_prompts_train.parquet \
-    --output data/prompts/mixed_prompts_train_with_prompt_embeddings.parquet
-python pipeline/data_preparation/save_prompt_embeddings.py \
-    --input  data/prompts/mixed_prompts_eval.parquet \
-    --output data/prompts/mixed_prompts_eval_with_prompt_embeddings.parquet
-
-# Optional: rebuild the UMR training CSV from judge scores
-python pipeline/data_preparation/build_umr_training_csv.py
-```
-
-**Output:** `data/prompts/mixed_prompts_{train,eval}.parquet` (+ embeddings)
-
-#### Step 2 — Hardware data collection (requires live vLLM + H100s)
-
-Launch the vLLM servers defined in `configs/gpu_model_map_h100.yaml`, then collect training and evaluation latency data.
-
-```bash
-python pipeline/data_collection/build_hardware_cost_dataset.py \
-    --config configs/gpu_model_map_h100.yaml \
-    --output data/h100_full_sweep.csv \
-    --pattern poisson --rate 5.0
-
-python pipeline/data_collection/build_eval_dataset.py \
-    --config configs/gpu_model_map_h100.yaml \
-    --output data/evaluation_dataset.csv
-
-python pipeline/data_collection/compute_normalization.py
-```
-
-**Output:** `data/h100_full_sweep.csv`, `data/evaluation_dataset.csv`
-
-#### Step 3 — Train the cost model (CPU only, ~20s)
-
-```bash
-python -m pipeline.training.train_cost_model
-```
-
-**Output:** `checkpoints/hardware_cost_model/{model.pt, preproc.joblib}`
-
-#### Step 4 — Process the evaluation dataset (CPU only)
-
-Append CARROT, UMR, and IRT predictions to the eval CSV. Run in order.
-
-```bash
-python pipeline/eval_processing/process_eval_dataset.py \
-    --input  data/evaluation_dataset.csv \
-    --output data/evaluation_dataset_processed_full.csv
-python pipeline/eval_processing/update_eval_with_umr.py
-python pipeline/eval_processing/update_eval_with_irt.py
-```
-
-**Output:** `data/evaluation_dataset_processed_full_with_umr_irt.csv`
-
-#### Step 5 — Evaluation
-
-Offline λ-sweep runs on CPU. Online evaluation requires live vLLM servers.
-
-```bash
-# Offline λ-sweep (Figure 4a, 4b)
-python pipeline/evaluation/eval_lambda_sweep.py \
-    --input data/evaluation_dataset_processed_full_with_umr_irt.csv
-
-# Online runtime router
-python pipeline/evaluation/eval_runtime_router.py \
-    --config      configs/gpu_model_map_h100.yaml \
-    --prompt_path data/prompts/mixed_prompts_eval.parquet \
-    --eval_csv    data/evaluation_dataset_processed_full_with_umr_irt.csv \
-    --router      hw
-
-# Online arrival-rate sweep
-python pipeline/evaluation/eval_realtime_sweep.py \
-    --router hw \
-    --arrival_rates "15,18,21" \
-    --pattern_type sustained
-```
-
-#### Retraining the baselines (optional)
-
-Pre-trained IRT and UMR artifacts are shipped under `baselines/`. To retrain from scratch after changing the model pool, use the judge scores under `data/data_quality/`:
-
-```bash
-python pipeline/data_preparation/build_umr_training_csv.py
-
-python baselines/irt/train_irt.py train \
-    --data-path data/UMR_router_training_data.csv \
-    --checkpoint baselines/irt/mirt_hw.snapshot
-
-python baselines/umr/umr_router.py train \
-    --train_csv data/UMR_router_training_data.csv \
-    --work_dir  checkpoints/umr
-```
+Full commands, inputs/outputs, and tips for each stage are in **[pipeline/README.md](pipeline/README.md)**. If you're swapping in different GPUs or a different model pool, also see **[docs/CUSTOM_HARDWARE_GUIDE.md](docs/CUSTOM_HARDWARE_GUIDE.md)**.
 
 ## Models
 

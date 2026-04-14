@@ -1,0 +1,17 @@
+gpus:
+  "0":
+    - name: qwen14b
+      base_url: http://localhost:8010
+
+    - name: phi3-mini
+      base_url: http://localhost:8011
+
+  "1":
+    - name: llama3-8b
+      base_url: http://localhost:8012
+
+    - name: qwen3b
+      base_url: http://localhost:8013
+
+    - name: mistral7b
+      base_url: http://localhost:8014

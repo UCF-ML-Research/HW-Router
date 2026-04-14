@@ -1,0 +1,14 @@
+{
+  "embed_model": "bert-base-uncased",
+  "latent_dim": 25,
+  "llm_dim": 768,
+  "query_dim": 768,
+  "llm_profile_path": "baselines/irt/llm_profile.csv",
+  "used_llms": [
+    "llama31_8b_instruct",
+    "mistral_7b_instruct_v03",
+    "phi3_mini_128k_instruct",
+    "qwen25_14b_instruct",
+    "qwen25_3b_instruct"
+  ]
+}

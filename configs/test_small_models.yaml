@@ -1,0 +1,7 @@
+gpus:
+  "0":
+    - name: tinyllama
+      base_url: http://localhost:8020
+
+    - name: qwen05b
+      base_url: http://localhost:8021

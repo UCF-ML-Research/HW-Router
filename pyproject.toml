@@ -55,7 +55,7 @@ all = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Ahasannn/hardware-aware-router"
+Repository = "https://github.com/UCF-ML-Research/HW-Router"
 
 [tool.setuptools.packages.find]
 include = ["hw_router*", "baselines*"]

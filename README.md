@@ -58,8 +58,8 @@ This means **any quality predictor can be made hardware-aware** simply by pairin
 ### Installation
 
 ```bash
-git clone https://github.com/Ahasannn/hardware-aware-router.git
-cd hardware-aware-router
+git clone https://github.com/UCF-ML-Research/HW-Router.git
+cd HW-Router
 pip install -e .
 ```
 
